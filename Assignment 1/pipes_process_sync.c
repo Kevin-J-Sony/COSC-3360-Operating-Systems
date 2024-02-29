@@ -38,7 +38,6 @@ void init_input_var(char* input_var_line, char* input_line, struct variable* arr
 	int n_elements = 1;
 	for (int i = 0; input_var_line[i] != '\0'; i++) {
 		if (input_var_line[i] == ',') n_elements++;
-		printf("%c", input_var_line[i]);
 	}
 	*size = n_elements;
 	
@@ -74,7 +73,6 @@ void init_internal_var(char* internal_line, struct variable* array, int* size) {
 	int n_elements = 1;
 	for (int i = 0; internal_line[i] != '\0'; i++) {
 		if (internal_line[i] == ',') n_elements++;
-		printf("%c", internal_line[i]);
 	}
 	*size = n_elements;
 
@@ -86,6 +84,15 @@ void init_internal_var(char* internal_line, struct variable* array, int* size) {
 		strcpy(array[idx++].name, tok);
 		tok = strtok(NULL, " ,;");
 	}
+}
+
+/*
+*	An auxillary function that takes in two numbers, the child_process_id of the writing process
+*	for two processes and the child_process_id of the reading process, and it returns the index of
+*	file descriptors for the pipe that sends info from the writing process to the reading process.
+*/
+int getfds() {
+
 }
 
 /*
@@ -172,16 +179,18 @@ int main(int argc, char** argv) {
 		pipe(fds_to_parent[i]);
 	}
 
-	int value = semctl(sid, 0, GETVAL, 0);
+	// the value of the process semaphore is set every time the program is run since
+	// testing shown that repeated runs have led to varying initial values for the semaphores
+	int value = semctl(sid, 0, SETVAL, 0);
 	printf("The value of the semaphore: %d\n", value);
 
 	/*
-	*	The value of the semaphore indicating the parent process should be 1, to allow
-	*	for two processes 
+	*	The value of the semaphore indicating the parent process should be 2, to allow
+	*	for two processes. The rest of the semaphores should have a value of 1.
 	*/
 	struct sembuf sb;	// this is a structure that indicate the operations to be done
 	sb.sem_num = 0;		// this is the semaphore the operations will be done on
-	sb.sem_op = 1;		// this is the operation done on the semaphore (incrementing by 1)
+	sb.sem_op = 2;		// this is the operation done on the semaphore (incrementing by 1)
 	sb.sem_flg = 0;		// this is the flag set on the operation, 0 since it is standard
 	semop(sid, &sb, 1);	// only 1 operation is being done, so a function is called
 
@@ -204,9 +213,6 @@ int main(int argc, char** argv) {
 			}
 		}
 	}
-
-	value = semctl(sid, 0, GETVAL);
-	printf("The value of the semaphore: %d\n", value);
 
 	if (pid) {
 		/*
@@ -260,14 +266,15 @@ int main(int argc, char** argv) {
 					// write in the pipe to pass to the child process
 					// responsible for the internal_variable
 					write((fds_to_child[i])[1], line, len);
-					printf("%s\n", line);
+					printf("is this recieved: %s\n", cur_int_var);
 
 					// close the write end of the pipe since parent is finished writing
 					// and so parent cannot write
 					close((fds_to_child[i])[1]);
 
-					// send a signal that the parent process is no longer occupied
-					sb.sem_num = 0;
+					// send a signal that the child process corresponding to the internal variable
+					// is now free to run the code
+					sb.sem_num = i + 1;
 					sb.sem_op = 1;
 					sb.sem_flg = 0;
 					semop(sid, &sb, 1);
@@ -277,6 +284,7 @@ int main(int argc, char** argv) {
 				}
 			}
 		}
+
 		
 		/*
 		*	Now that the parent has finished reading the precedence graph, indicate this increasing
@@ -288,6 +296,39 @@ int main(int argc, char** argv) {
 		sb.sem_flg = 0;
 		semop(sid, &sb, 1);
 
+		/*
+		*	Instead of using a semaphore to signal to the child processes that this code has finished,
+		*	send a message to all the child processes, containing the final instruction
+		*
+		for (int i = 0; i < n_internal_var; i++) {
+			// send a signal that the parent process is occupied
+			sb.sem_num = 0;
+			sb.sem_op = -1;
+			sb.sem_flg = 0;
+			semop(sid, &sb, 1);
+
+			// close the read end of the pipe since parent is not finished writing
+			// and so child cannot read yet
+			close((fds_to_child[i])[0]);
+
+			// write in the pipe to pass to the child process
+			// responsible for the internal_variable
+			write((fds_to_child[i])[1], line, len);
+			
+			// close the write end of the pipe since parent is finished writing
+			// and so parent cannot write
+			close((fds_to_child[i])[1]);
+
+			// send a signal that the child process corresponding to the internal variable
+			// is now free to run the code
+			sb.sem_num = i + 1;
+			sb.sem_op = 1;
+			sb.sem_flg = 0;
+			semop(sid, &sb, 1);
+		}
+		*/
+
+
 	} else {
 		/*
 		*	While the parent process is reading from the file, the child process should not leave the loop.
@@ -297,25 +338,34 @@ int main(int argc, char** argv) {
 		*	If the parent process signals while the child process is still in the loop, the child can safely
 		*	finish up parsing the line and modifying the value and exit the loop. 
 		*/
-		while(1) {			
-			// send a signal that this internal variable is occupied
+		do {
+			printf("process %d waiting...\n", child_process_id);
+			// send a signal that this internal variable is waiting for the parent process to write
 			sb.sem_num = child_process_id + 1;
 			sb.sem_op = -1;
 			sb.sem_flg = 0;
 			semop(sid, &sb, 1);
+			printf("process %d permitted to go!\n", child_process_id);
 
 			// close write end of pipe since child process is not finished reading from parent
-			close((fds_to_child[0])[1]);
+			close((fds_to_child[child_process_id])[1]);
 
-			read((fds_to_child[child_process_id + 1])[0], line, len);
+			read((fds_to_child[child_process_id])[0], line, len);
 
 			// close read end of pipe since child process is finished reading from parent
-			close((fds_to_child[0])[0]);
+			close((fds_to_child[child_process_id])[0]);
 
-			printf("\nprocess_id: %d\t[%s]\n", child_process_id + 1, line);
+			// send a signal that the parent process is no longer needed
+			sb.sem_num = 0;
+			sb.sem_op = 1;
+			sb.sem_flg = 0;
+			semop(sid, &sb, 1);
 
 
-			strcpy(line, sec_line);
+			printf("\nprocess_id: %d\t[%s]\n", child_process_id, line);
+
+
+			strcpy(sec_line, line);
 			char* tok = strtok(sec_line," ,;\n");
 			int n_elements = 4;
 			int n_char = 3;
@@ -328,46 +378,127 @@ int main(int argc, char** argv) {
 			}
 
 			if (idx != 4) {
-				printf("%s\n", ray[2]);
-				for (int i = 0; i < n_internal_var; i++) {
-					if (strcmp(internal_var[i].name, ray[2]) == 0) {
-						// close the read end of the pipe
-						close((fds_to_child[i])[0]);
-
-						// write in the pipe to pass to the child process
-						// responsible for the internal_variable
-						write((fds_to_child[i])[1], line, len);
-
-						// close the write end of the pipe
-						close((fds_to_child[i])[1]);
+				int internal = (1 == 1);
+				for (int i = 0; i < n_input_var; i++) {
+					if (strcmp(input_var[i].name, ray[0]) == 0) {
+						internal_var[child_process_id].value = input_var[i].value;
+						internal = (1 == 0);
 						break;
 					}
 				}
-			} else {
-				printf("%s\n", ray[3]);
-				for (int i = 0; i < n_internal_var; i++) {
-					if (strcmp(internal_var[i].name, ray[3]) == 0) {
+				for (int i = 0; i < n_internal_var && internal; i++) {
+					if (strcmp(internal_var[i].name, ray[0]) == 0) {
+						// signal that the other internal variable will be used
+						// if it is already in use, then it will wait
+						sb.sem_num = i + 1;
+						sb.sem_op = -1;
+						sb.sem_flg = 0;
+						semop(sid, &sb, 1);
+
+						// send an instruction to the variable to be read so that
+						// it updates the parent process with the current value it holds
+						// and for the parent process to then write the value of
+
+						internal_var[child_process_id].value = internal_var[i].value;
+
+						// signal that the other internal variable is freed
+						sb.sem_num = i + 1;
+						sb.sem_op = 1;
+						sb.sem_flg = 0;
+						semop(sid, &sb, 1);
+
+						printf("is this message hear?\n");
+
 						break;
 					}
+				}
+
+			} else {
+				int x;
+				int internal = (1 == 1);
+				for (int i = 0; i < n_input_var; i++) {
+					if (strcmp(input_var[i].name, ray[1]) == 0) {
+						x = input_var[i].value;
+						internal = (1 == 0);
+						break;
+					}
+				}
+				for (int i = 0; i < n_internal_var && internal; i++) {
+					if (strcmp(internal_var[i].name, ray[1]) == 0) {
+						// signal that the other internal variable will be used
+						// if it is already in use, then it will wait
+						sb.sem_num = i + 1;
+						sb.sem_op = -1;
+						sb.sem_flg = 0;
+						semop(sid, &sb, 1);
+
+						x = internal_var[i].value;
+
+						// signal that the other internal variable is freed
+						sb.sem_num = i + 1;
+						sb.sem_op = 1;
+						sb.sem_flg = 0;
+						semop(sid, &sb, 1);
+
+						break;
+					}
+				}
+
+				if (strcmp("+", ray[1]) == 0) {
+					internal_var[child_process_id].value += x;
+				} else if (strcmp("-", ray[1]) == 0) {
+					internal_var[child_process_id].value -= x;
+				} else if (strcmp("*", ray[1]) == 0) {
+					internal_var[child_process_id].value *= x;
+				} else if (strcmp("/", ray[1]) == 0) {
+					internal_var[child_process_id].value /= x;
 				}
 			}
 
-			// send a signal that this internal variable is free
-			sb.sem_num = child_process_id + 1;
-			sb.sem_op = 1;
-			sb.sem_flg = 0;
-			semop(sid, &sb, 1);
-
-		}
+			// get the value of the parent process semaphore to see if it has
+			// finished reading the precedence graph file
+			
+			value = semctl(sid, child_process_id + 1, GETVAL, 0);
+			printf("value: %d\n", value);
+			
+		} while (value != 2);
 	}
 
 	if (!pid) {
+		printf("Signing off: %d\n", child_process_id + 1);
 		exit(EXIT_SUCCESS);
 	}
 	fclose(prec_graph);
 
-
 	semctl(sid, 0, IPC_RMID, 0);
+
+	for (int i = 0; i < n_internal_var; i++) {
+		printf("%s -> %d", internal_var[i].name, internal_var[i].value);
+	}
 
 	return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// the current problem im dealing with rn
+// is with p1 -> p2
+// im reading an internal variable and writing to an internal variable
+// and that is an issue because child processes cannot read from other child processes
+// as one of the stipulations i laid down
+
+// i must break this stipulation

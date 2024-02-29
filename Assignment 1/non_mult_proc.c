@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
 			
 		}
 
-		for (int i = n_elements - 1; i >= 0; i--) {
+		for (int i = 0; i < n_elements; i++) {
 			printf("%s, ", ray[i]);
 		}
 		printf("\n");
