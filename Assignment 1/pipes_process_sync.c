@@ -30,9 +30,11 @@ struct variable {
 *   the format for strings are known, use sscanf instead.
 */
 void init_input_var(char* input_var_line, char* input_line, struct variable* array, int* size) {
-	// Find the number of input variables given the input_line.
-	// This is done by finding the number of commas splitting the
-	// variables apart and adding 1 to it.
+	/*
+	*	Find the number of input variables given input_line.
+	*	This is done by finding the number of commas splitting the
+	*	variables apart and adding 1 to it.
+	*/
 	int n_elements = 1;
 	for (int i = 0; input_var_line[i] != '\0'; i++) {
 		if (input_var_line[i] == ',') n_elements++;
@@ -64,15 +66,17 @@ void init_input_var(char* input_var_line, char* input_line, struct variable* arr
 *	by child processes, although, it should not be plagued by the same problems.
 */
 void init_internal_var(char* internal_line, struct variable* array, int* size) {
-	// Find the number of internal variables given internal_line.
-	// This is done by finding the number of commas splitting the
-	// variables apart and adding 1 to it.
+	/*
+	*	Find the number of internal variables given internal_line.
+	*	This is done by finding the number of commas splitting the
+	*	variables apart and adding 1 to it.
+	*/
 	int n_elements = 1;
 	for (int i = 0; internal_line[i] != '\0'; i++) {
 		if (internal_line[i] == ',') n_elements++;
 		printf("%c", internal_line[i]);
 	}
-	*size = n_elements;\
+	*size = n_elements;
 
 	int idx = 0;
 	char* tok = strtok(internal_line," ,;");
@@ -129,11 +133,11 @@ int main(int argc, char** argv) {
 	FILE* input = fopen(argv[2], "r");
 
 	/*
-	*   If the files are not provided, return
+	*   If the files are not provided, exit
 	*/
 	if (prec_graph == NULL || input == NULL) {
 		printf("The files are null\n");
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 	
 	/*
@@ -153,14 +157,14 @@ int main(int argc, char** argv) {
 
 	/*
 	*	With the input variables and internal variables defined, initialize
-	*	10 semaphores, although some might not be needed. The semaphores serve as a
-	*	way to restrict access to the internal variables.
+	*	10+1 semaphores, the extra semaphore being for the parent process. The 
+	*	semaphores serve as a way to restrict access to the internal variables.
 	*	
-	*	Furthermore, create 10 pipes, each pipe interacting strictly between the parent
-	*	and child process, and never between child processes.
+	*	Furthermore, create 10 pipes, each pipe for communication from the parent to a
+	*	child process. Create another 10 pipes for communication from parent process to
+	*	child process.
 	*/
-	struct sembuf res[10];
-	int sem = semget(2077318, 1, 0666 | IPC_CREAT);
+	int sid = semget(2077318, 10+1, 0666 | IPC_CREAT);
 	int fds_to_child[10][2];
 	int fds_to_parent[10][2];
 	for (int i = 0; i < 10; i++) {
@@ -168,6 +172,25 @@ int main(int argc, char** argv) {
 		pipe(fds_to_parent[i]);
 	}
 
+	int value = semctl(sid, 0, GETVAL, 0);
+	printf("The value of the semaphore: %d\n", value);
+
+	/*
+	*	The value of the semaphore indicating the parent process should be 1, to allow
+	*	for two processes 
+	*/
+	struct sembuf sb;	// this is a structure that indicate the operations to be done
+	sb.sem_num = 0;		// this is the semaphore the operations will be done on
+	sb.sem_op = 1;		// this is the operation done on the semaphore (incrementing by 1)
+	sb.sem_flg = 0;		// this is the flag set on the operation, 0 since it is standard
+	semop(sid, &sb, 1);	// only 1 operation is being done, so a function is called
+
+	/**
+	*	Identify the parent process with -1, and the child process with values from 0 to
+	*	one short of the number of internal variables (n_internal_var - 1). The reason for this
+	*	method of identification is the ease in which writing the code for child processes
+	*	become.
+	*/
 	int child_process_id = -1;
 	int pid = fork();
 	if (!pid) {
@@ -182,10 +205,116 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	value = semctl(sid, 0, GETVAL);
+	printf("The value of the semaphore: %d\n", value);
+
 	if (pid) {
-		// parent process reads the files and pipes to different processes
+		/*
+		*	Indicate that the parent process is being partially occupied by reading the file, and
+		*	so that the "number of parent processes" available to send info to is decreased by one.
+		*	
+		*	The reason for this is because once the parent process finishes reading the files and
+		*	sending the information to the respective child processes, there should be some way
+		*	for the child process to know that it no longer needs to keep on "listening" to what
+		*	the parent has to say.
+		*/
+		sb.sem_num = 0;
+		sb.sem_op = -1;
+		sb.sem_flg = 0;
+		semop(sid, &sb, 1);
+		/*
+		*	The parent process reads the precedence graph file line by line
+		*	and sends the result to the child process.
+		*/
 		while (!feof(prec_graph)) {
 			fgets(sec_line, len, prec_graph);
+			strcpy(line, sec_line);
+			// if sec_line is "write(x, y, z, ...);", break out of the loop
+			if (sec_line[0] == 'w')
+				break;
+			
+			// otherwise, get the string of the last variable to assign it to
+			// the corresponding process
+			char* tok = strtok(sec_line," ,;\n");
+			int n_char = 3;
+			char cur_int_var[n_char];
+			int idx = 0;
+
+			while (tok != NULL) {
+				strcpy(cur_int_var, tok);
+				tok = strtok(NULL, " ,;\n");
+			}
+
+			for (int i = 0; i < n_internal_var; i++) {
+				if (strcmp(internal_var[i].name, cur_int_var) == 0) {
+					// send a signal that the parent process is occupied
+					sb.sem_num = 0;
+					sb.sem_op = -1;
+					sb.sem_flg = 0;
+					semop(sid, &sb, 1);
+
+					// close the read end of the pipe since parent is not finished writing
+					// and so child cannot read yet
+					close((fds_to_child[i])[0]);
+
+					// write in the pipe to pass to the child process
+					// responsible for the internal_variable
+					write((fds_to_child[i])[1], line, len);
+					printf("%s\n", line);
+
+					// close the write end of the pipe since parent is finished writing
+					// and so parent cannot write
+					close((fds_to_child[i])[1]);
+
+					// send a signal that the parent process is no longer occupied
+					sb.sem_num = 0;
+					sb.sem_op = 1;
+					sb.sem_flg = 0;
+					semop(sid, &sb, 1);
+
+					// exit the loop
+					break;
+				}
+			}
+		}
+		
+		/*
+		*	Now that the parent has finished reading the precedence graph, indicate this increasing
+		*	the value of the semaphore corresponding to the parent process. This serves as a way to
+		*	"signal" to the children that the parents are done.
+		*/
+		sb.sem_num = 0;
+		sb.sem_op = 1;
+		sb.sem_flg = 0;
+		semop(sid, &sb, 1);
+
+	} else {
+		/*
+		*	While the parent process is reading from the file, the child process should not leave the loop.
+		*	In the case that the parent signals, it means that it has finished reading the file, and is ready for
+		*	the child processes to finish their tasks and pipe the values it contains back to it to store it.
+		*	
+		*	If the parent process signals while the child process is still in the loop, the child can safely
+		*	finish up parsing the line and modifying the value and exit the loop. 
+		*/
+		while(1) {			
+			// send a signal that this internal variable is occupied
+			sb.sem_num = child_process_id + 1;
+			sb.sem_op = -1;
+			sb.sem_flg = 0;
+			semop(sid, &sb, 1);
+
+			// close write end of pipe since child process is not finished reading from parent
+			close((fds_to_child[0])[1]);
+
+			read((fds_to_child[child_process_id + 1])[0], line, len);
+
+			// close read end of pipe since child process is finished reading from parent
+			close((fds_to_child[0])[0]);
+
+			printf("\nprocess_id: %d\t[%s]\n", child_process_id + 1, line);
+
+
 			strcpy(line, sec_line);
 			char* tok = strtok(sec_line," ,;\n");
 			int n_elements = 4;
@@ -198,54 +327,47 @@ int main(int argc, char** argv) {
 				tok = strtok(NULL, " ,;\n");
 			}
 
-			// printf("%d:\t", idx);
 			if (idx != 4) {
+				printf("%s\n", ray[2]);
 				for (int i = 0; i < n_internal_var; i++) {
-					if (strcmp(internal_var[i].name, ray[1]) == 0) {
-						// normally, this is where you would pipe
-						// however, in this case, we want to get the read of the next action
-						// pipe(); // write to process taking care of internal_var[i]
+					if (strcmp(internal_var[i].name, ray[2]) == 0) {
+						// close the read end of the pipe
+						close((fds_to_child[i])[0]);
+
+						// write in the pipe to pass to the child process
+						// responsible for the internal_variable
+						write((fds_to_child[i])[1], line, len);
+
+						// close the write end of the pipe
+						close((fds_to_child[i])[1]);
 						break;
 					}
 				}
 			} else {
+				printf("%s\n", ray[3]);
 				for (int i = 0; i < n_internal_var; i++) {
-					if (strcmp(internal_var[i].name, ray[1]) == 0) {
-						// normally, this is where you would pipe
-						// however, in this case, we want to get the read of the next action
-						// pipe(); // write to process taking care of internal_var[i]
+					if (strcmp(internal_var[i].name, ray[3]) == 0) {
 						break;
 					}
 				}
 			}
+
+			// send a signal that this internal variable is free
+			sb.sem_num = child_process_id + 1;
+			sb.sem_op = 1;
+			sb.sem_flg = 0;
+			semop(sid, &sb, 1);
+
 		}
-
-		char* msg = "This is a Hello World from parent process\n";
-
-		close((fds_to_child[0])[0]); // close read end of pipe since parent process is not finished writing to child
-		write((fds_to_child[0])[1], msg, strlen(msg));
-		close((fds_to_child[0])[1]); // close write end of pipe since parent process is finished writing to child
-	} else {
-		close((fds_to_child[0])[1]); // close write end of pipe since child process is not finished reading from parent
-		char buf[44];
-		read((fds_to_child[0])[0], &buf, 44);
-		write(STDOUT_FILENO, &buf, 44);
-		/*
-		while (read((fds_to_child[0])[0], &buf, 44) > 0) {
-			write(STDOUT_FILENO, &buf, 1);
-		}*/
-		write(STDOUT_FILENO, "\n", 1);
-		close((fds_to_child[0])[0]); // close read end of pipe since child process is finished reading from parent
-
-		printf("process_id: %d\t%s\n", child_process_id, internal_var[child_process_id].name);
 	}
 
+	if (!pid) {
+		exit(EXIT_SUCCESS);
+	}
 	fclose(prec_graph);
 
 
-	if (!pid) {
-		exit(0);
-	}
+	semctl(sid, 0, IPC_RMID, 0);
 
 	return 0;
 }
