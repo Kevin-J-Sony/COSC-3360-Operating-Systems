@@ -163,7 +163,11 @@ int main(int argc, char** argv) {
 	*	with a process, so that a process reads from a pipe, and other processes
 	*	write in the pipe of the process they wish to communicate to
 	*/
+	// int sid = semget(2077318, 10+1, 0666 | IPC_CREAT);
+	struct sembuf op[10 + 1];
+	// int sid = semget(2077318, 1, 0666 | IPC_CREAT);
 	int sid = semget(2077318, 10+1, 0666 | IPC_CREAT);
+	
 	int fd_of_proc[10+1][2];
 	for (int i = 0; i < 10; i++) {
 		pipe(fd_of_proc[i]);
@@ -246,12 +250,23 @@ int main(int argc, char** argv) {
 					sb.sem_flg = 0;
 					semop(sid, &sb, 1);
 					*/
+					op[i + 1].sem_num = i + 1;
+					op[i + 1].sem_op = 1;
+					op[i + 1].sem_flg = 0;
+					semop(sid, &op[i + 1], 1);
+					
 
 					// wait for the child process to finish reading the pipe
+					/*
 					sb.sem_num = 0;
 					sb.sem_op = -1;
 					sb.sem_flg = 0;
 					semop(sid, &sb, 1);
+					*/
+					op[0].sem_num = 0;
+					op[0].sem_op = -1;
+					op[0].sem_flg = 0;
+					semop(sid, &op[0], 1);
 
 					// exit the loop
 					break;
@@ -271,22 +286,40 @@ int main(int argc, char** argv) {
 			write((fd_of_proc[i + 1])[1], child_process_id_str, 3);
 
 			// signal that the child process it requests data from should read
+			/*
 			sb.sem_num = i + 1;
 			sb.sem_op = 1;
 			sb.sem_flg = 0;
 			semop(sid, &sb, 1);
+			*/
+			op[i + 1].sem_num = i + 1;
+			op[i + 1].sem_op = 1;
+			op[i + 1].sem_flg = 0;
+			semop(sid, &op[i + 1], 1);
 
 			// wait until process it requests data from finished reading
+			/*
 			sb.sem_num = child_process_id + 1;
 			sb.sem_op = -1;
 			sb.sem_flg = 0;
 			semop(sid, &sb, 1);
+			*/
+			op[child_process_id + 1].sem_num = child_process_id + 1;
+			op[child_process_id + 1].sem_op = -1;
+			op[child_process_id + 1].sem_flg = 0;
+			semop(sid, &op[child_process_id + 1], 1);
 
-			// wait for process it requests data from to finish reading
+			// wait for process it requests data from to finish writing
+			/*
 			sb.sem_num = child_process_id + 1;
 			sb.sem_op = -1;
 			sb.sem_flg = 0;
 			semop(sid, &sb, 1);
+			*/
+			op[child_process_id + 1].sem_num = child_process_id + 1;
+			op[child_process_id + 1].sem_op = -1;
+			op[child_process_id + 1].sem_flg = 0;
+			semop(sid, &op[child_process_id + 1], 1);
 
 			// read the response from the process
 			char buff[10];
@@ -313,10 +346,16 @@ int main(int argc, char** argv) {
 			struct sembuf sb;
 			printf("process %d waiting...\n", child_process_id);
 			// send a signal that this internal variable is waiting for the another process to write
+			/*
 			sb.sem_num = child_process_id + 1;
 			sb.sem_op = -1;
 			sb.sem_flg = 0;
 			semop(sid, &sb, 1);
+			*/
+			op[child_process_id + 1].sem_num = child_process_id + 1;
+			op[child_process_id + 1].sem_op = -1;
+			op[child_process_id + 1].sem_flg = 0;
+			semop(sid, &op[child_process_id + 1], 1);
 			printf("process %d permitted to go!\n", child_process_id);
 
 			// for now, don't close the pipes since there is no way to reopen them
@@ -328,16 +367,22 @@ int main(int argc, char** argv) {
 			int writing_process;
 			sscanf(writing_process_str, "%d", &writing_process);
 			printf("process %d reading message sent from process %d. message: %s", child_process_id, writing_process, line);
-								sleep(1);	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+								//sleep(1);	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 			// close read end of pipe since child process is finished reading from parent
 			// close((fd_of_proc[child_process_id - 1])[0]);
 
 			// send a signal to the writing process that the current process has finished reading
+			/*
 			sb.sem_num = writing_process + 1;
 			sb.sem_op = 1;
 			sb.sem_flg = 0;
 			semop(sid, &sb, 1);
+			*/
+			op[writing_process + 1].sem_num = writing_process + 1;
+			op[writing_process + 1].sem_op = 1;
+			op[writing_process + 1].sem_flg = 0;
+			semop(sid, &op[writing_process + 1], 1);
 
 			/*
 			*	If the message sent is explicitly a "send data" or "terminate" request, send data to the
@@ -351,10 +396,16 @@ int main(int argc, char** argv) {
 				write((fd_of_proc[writing_process + 1])[1], buff, 10);
 
 				// signal that the child process should read
+				/*
 				sb.sem_num = writing_process + 1;
 				sb.sem_op = 1;
 				sb.sem_flg = 0;
 				semop(sid, &sb, 1);
+				*/
+				op[writing_process + 1].sem_num = writing_process + 1;
+				op[writing_process + 1].sem_op = 1;
+				op[writing_process + 1].sem_flg = 0;
+				semop(sid, &op[writing_process + 1], 1);
 			} else if (strcmp(line, "terminate\n") == 0) {
 				terminate = (1 == 1);				
 			} else{
@@ -389,23 +440,40 @@ int main(int argc, char** argv) {
 							write((fd_of_proc[i + 1])[1], child_process_id_str, 3);
 
 							// signal that process it requests data from should read
+							/*
 							sb.sem_num = i + 1;
 							sb.sem_op = 1;
 							sb.sem_flg = 0;
 							semop(sid, &sb, 1);
+							*/
+							op[i + 1].sem_num = i + 1;
+							op[i + 1].sem_op = 1;
+							op[i + 1].sem_flg = 0;
+							semop(sid, &op[i + 1], 1);
 
 							// wait until process it requests data from finished reading
+							/*
 							sb.sem_num = child_process_id + 1;
 							sb.sem_op = -1;
 							sb.sem_flg = 0;
 							semop(sid, &sb, 1);
-
+							*/
+							op[child_process_id + 1].sem_num = child_process_id + 1;
+							op[child_process_id + 1].sem_op = -1;
+							op[child_process_id + 1].sem_flg = 0;
+							semop(sid, &op[child_process_id + 1], 1);
 
 							// wait for process it requests data from to finish reading
+							/*
 							sb.sem_num = child_process_id + 1;
 							sb.sem_op = -1;
 							sb.sem_flg = 0;
 							semop(sid, &sb, 1);
+							*/
+							op[child_process_id + 1].sem_num = child_process_id + 1;
+							op[child_process_id + 1].sem_op = -1;
+							op[child_process_id + 1].sem_flg = 0;
+							semop(sid, &op[child_process_id + 1], 1);
 
 							// read the response from the process
 							char buff[10];
@@ -436,23 +504,41 @@ int main(int argc, char** argv) {
 							write((fd_of_proc[i + 1])[1], child_process_id_str, 3);
 
 							// signal that process it requests data from should read
+							/*
 							sb.sem_num = i + 1;
 							sb.sem_op = 1;
 							sb.sem_flg = 0;
 							semop(sid, &sb, 1);
+							*/
+							op[i + 1].sem_num = i + 1;
+							op[i + 1].sem_op = 1;
+							op[i + 1].sem_flg = 0;
+							semop(sid, &op[i + 1], 1);
 
 							// wait until process it requests data from finished reading
+							/*
 							sb.sem_num = child_process_id + 1;
 							sb.sem_op = -1;
 							sb.sem_flg = 0;
 							semop(sid, &sb, 1);
+							*/
+							op[child_process_id + 1].sem_num = child_process_id + 1;
+							op[child_process_id + 1].sem_op = -1;
+							op[child_process_id + 1].sem_flg = 0;
+							semop(sid, &op[child_process_id + 1], 1);
 
 
 							// wait for process it requests data from to finish reading
+							/*
 							sb.sem_num = child_process_id + 1;
 							sb.sem_op = -1;
 							sb.sem_flg = 0;
 							semop(sid, &sb, 1);
+							*/
+							op[child_process_id + 1].sem_num = child_process_id + 1;
+							op[child_process_id + 1].sem_op = -1;
+							op[child_process_id + 1].sem_flg = 0;
+							semop(sid, &op[child_process_id + 1], 1);
 
 							// read the response from the process
 							char buff[10];
@@ -474,7 +560,7 @@ int main(int argc, char** argv) {
 					}
 				}
 			}
-			
+			printf("process %d internal variable state: %s\t%d\n", child_process_id, internal_var[child_process_id].name, internal_var[child_process_id].value);
 		} while (!terminate);
 		exit(EXIT_SUCCESS);
 	}
