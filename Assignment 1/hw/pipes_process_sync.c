@@ -205,18 +205,15 @@ int main(int argc, char** argv) {
 		struct sembuf sb;
 		int terminate = (1 == 0);
 		while (!feof(prec_graph) && !terminate) {
-			// fgets(sec_line, len, prec_graph);
-			fscanf(prec_graph, "%[^\n]\n", sec_line);
+			fgets(sec_line, len, prec_graph);
 			strcpy(line, sec_line);
 			
 			int n_char = 3;
 			char cur_int_var[n_char];
 			char* tok = strtok(sec_line," ,;()\n");
-			printf("%s\n", line);
 			// if the first token is write, end the loop
 			if (strcmp(tok, "write") == 0) {
-				printf("\n\nWrite\ntok: %s\n\n", tok);
-				terminate = (1 == 1);
+				printf("\n\nWrite\n\n");
 				break;
 			}
 
