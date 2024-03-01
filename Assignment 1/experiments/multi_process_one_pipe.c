@@ -14,7 +14,7 @@ int main() {
     }
 
     for (int i = 0; i < NUM_PROCESSES; i++) {
-        pid_t pid = fork();
+        int pid = fork();
 
         if (pid == -1) {
             perror("fork");
