@@ -87,18 +87,6 @@ void init_internal_var(char* internal_line, struct variable* array, int* size) {
 }
 
 /*
-*	An auxillary function that takes in two numbers, the child_process_id of the writing process
-*	for two processes and the child_process_id of the reading process, and it returns the index of
-*	file descriptors for the pipe that sends info from the writing process to the reading process.
-*
-*	The method operates under the assumption that there are 11 processes, 10 child and 1 parent.
-*	It takes in the 
-*/
-int getfds(int writer_process, int reader_process) {
-	return (writer_process + 1) * (10 + 1) + (reader_process + 1);
-}
-
-/*
 *	This program takes in two arguments from terminal given by the user.
 *	
 *	The first argument is the file to precedence graph, and the second argument
@@ -171,12 +159,14 @@ int main(int argc, char** argv) {
 	*	semaphores serve as a way to restrict access to the internal variables.
 	*	
 	*	With pipes, closing them means that there is no way to reopen them, and a new
-	*	pipe would have to be constructed to send over the data
+	*	pipe would have to be constructed to send over the data. Associate each pipe
+	*	with a process, so that a process reads from a pipe, and other processes
+	*	write in the pipe of the process they wish to communicate to
 	*/
 	int sid = semget(2077318, 10+1, 0666 | IPC_CREAT);
-	int fds_to_child[10][2];
+	int fd_of_proc[10+1][2];
 	for (int i = 0; i < 10; i++) {
-		pipe(fds_to_child[i]);
+		pipe(fd_of_proc[i]);
 	}
 
 	/**
@@ -184,6 +174,11 @@ int main(int argc, char** argv) {
 	*	one short of the number of internal variables (n_internal_var - 1). The reason for this
 	*	method of identification is the ease in which writing the code for child processes
 	*	become.
+	*
+	*	It's a crucial way to classify the different processes, important for the management
+	*	of different semaphores and pipes. The parent process has an ID of -1, and is associate
+	*	index 0 for semaphores and pipes, and the general formula to get the index of the
+	*	the associate pipe/semaphore for a process is child_process + 1.
 	*/
 	int child_process_id = -1;
 	int pid = 1;
@@ -199,21 +194,6 @@ int main(int argc, char** argv) {
 	sprintf(child_process_id_str, "%d", child_process_id);
 
 	if (pid) {
-		/*
-		*	Indicate that the parent process is being partially occupied by reading the file, and
-		*	so that the "number of parent processes" available to send info to is decreased by one.
-		*	
-		*	The reason for this is because once the parent process finishes reading the files and
-		*	sending the information to the respective child processes, there should be some way
-		*	for the child process to know that it no longer needs to keep on "listening" to what
-		*	the parent has to say.
-		*/
-		/*
-		sb.sem_num = 0;
-		sb.sem_op = -1;
-		sb.sem_flg = 0;
-		semop(sid, &sb, 1);
-		*/
 		/*
 		*	The parent process reads the precedence graph file line by line
 		*	and sends the result to the child process.
@@ -244,26 +224,28 @@ int main(int argc, char** argv) {
 					// don't close since it's impossible to tell when to open
 					// close the read end of the pipe since parent is not finished writing
 					// and so child cannot read yet	
-					// close((fds_to_child[i])[0]);
+					// close((fd_of_proc[i])[0]);
 
 					// write in the pipe to pass the message to the child process
 					// responsible for the internal_variable
-					write((fds_to_child[i])[1], line, len);
+					write((fd_of_proc[i + 1])[1], line, len);
 					// furthemore, write down the process it came from
-					write((fds_to_child[i])[1], child_process_id_str, 3);
+					write((fd_of_proc[i + 1])[1], child_process_id_str, 3);
 
-					printf("is this recieved: %s\n", cur_int_var);
+					printf("send the message: %s\n", cur_int_var);
 
 					// close the write end of the pipe since parent is finished writing
 					// and so parent cannot write
-					// close((fds_to_child[i])[1]);
+					// close((fd_of_proc[i])[1]);
 
 					// send a signal that the child process corresponding to the internal variable
 					// is now free to run the code
+					/*
 					sb.sem_num = i + 1;
 					sb.sem_op = 1;
 					sb.sem_flg = 0;
 					semop(sid, &sb, 1);
+					*/
 
 					// wait for the child process to finish reading the pipe
 					sb.sem_num = 0;
@@ -276,6 +258,7 @@ int main(int argc, char** argv) {
 				}
 			}
 		}
+		printf("\n\n\nFINISHED READING\n\n\n");
 
 		/*
 		*	Send a message to all child processes to send data and to terminate
@@ -283,9 +266,9 @@ int main(int argc, char** argv) {
 		*/
 		for (int i = 0; i < n_internal_var; i++) {
 			// send a final request for the internal variable
-			strcpy(line, "send data");
-			write((fds_to_child[i])[1], line, len);
-			write((fds_to_child[i])[1], child_process_id_str, 3);
+			strcpy(line, "send data\n");
+			write((fd_of_proc[i + 1])[1], line, len);
+			write((fd_of_proc[i + 1])[1], child_process_id_str, 3);
 
 			// signal that the child process it requests data from should read
 			sb.sem_num = i + 1;
@@ -307,13 +290,13 @@ int main(int argc, char** argv) {
 
 			// read the response from the process
 			char buff[10];
-			read((fds_to_child[i])[0], buff, 10);
+			read((fd_of_proc[i])[0], buff, 10);
 			sscanf(buff, "%d", &internal_var[i].value);
 
 			// send the instruction to terminate
-			strcpy(line, "terminate");
-			write((fds_to_child[i])[1], line, len);
-			write((fds_to_child[i])[1], child_process_id_str, 3);
+			strcpy(line, "terminate\n");
+			write((fd_of_proc[i + 1])[1], line, len);
+			write((fd_of_proc[i + 1])[1], child_process_id_str, 3);
 		}
 
 	} else {
@@ -338,17 +321,17 @@ int main(int argc, char** argv) {
 
 			// for now, don't close the pipes since there is no way to reopen them
 			// close write end of pipe since child process is not finished reading from parent
-			// close((fds_to_child[child_process_id - 1])[1]);
+			// close((fd_of_proc[child_process_id - 1])[1]);
 			char writing_process_str[3];
-			read((fds_to_child[child_process_id])[0], line, len);
-			read((fds_to_child[child_process_id])[0], writing_process_str, 3);
+			read((fd_of_proc[child_process_id + 1])[0], line, len);
+			read((fd_of_proc[child_process_id + 1])[0], writing_process_str, 3);
 			int writing_process;
 			sscanf(writing_process_str, "%d", &writing_process);
 			printf("process %d reading message sent from process %d. message: %s", child_process_id, writing_process, line);
 								sleep(1);	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 			// close read end of pipe since child process is finished reading from parent
-			// close((fds_to_child[child_process_id - 1])[0]);
+			// close((fd_of_proc[child_process_id - 1])[0]);
 
 			// send a signal to the writing process that the current process has finished reading
 			sb.sem_num = writing_process + 1;
@@ -360,19 +343,19 @@ int main(int argc, char** argv) {
 			*	If the message sent is explicitly a "send data" or "terminate" request, send data to the
 			*	writing process or terminate. Otherwise, assume that the message is an instruction.
 			*/
-			if (strcmp(line, "send data") == 0) {
+			if (strcmp(line, "send data\n") == 0) {
 				// this is an instruction to send data to the writing process
 
 				char buff[10];
 				sprintf(buff, "%d", internal_var[child_process_id].value);
-				write((fds_to_child[writing_process + 1])[1], buff, 10);
+				write((fd_of_proc[writing_process + 1])[1], buff, 10);
 
 				// signal that the child process should read
 				sb.sem_num = writing_process + 1;
 				sb.sem_op = 1;
 				sb.sem_flg = 0;
 				semop(sid, &sb, 1);
-			} else if (strcmp(line, "terminate") == 0) {
+			} else if (strcmp(line, "terminate\n") == 0) {
 				terminate = (1 == 1);				
 			} else{
 				strcpy(sec_line, line);
@@ -401,9 +384,9 @@ int main(int argc, char** argv) {
 						if (strcmp(internal_var[i].name, ray[0]) == 0) {
 							// send a request for an internal variable
 							strcpy(line, "send data");
-							write((fds_to_child[i])[1], line, len);
+							write((fd_of_proc[i + 1])[1], line, len);
 							// furthemore, write down the process it came from
-							write((fds_to_child[i])[1], child_process_id_str, 3);
+							write((fd_of_proc[i + 1])[1], child_process_id_str, 3);
 
 							// signal that process it requests data from should read
 							sb.sem_num = i + 1;
@@ -426,7 +409,7 @@ int main(int argc, char** argv) {
 
 							// read the response from the process
 							char buff[10];
-							read((fds_to_child[i])[0], buff, 10);
+							read((fd_of_proc[child_process_id + 1])[0], buff, 10);
 							sscanf(buff, "%d", &x);
 
 							break;
@@ -448,9 +431,9 @@ int main(int argc, char** argv) {
 						if (strcmp(internal_var[i].name, ray[1]) == 0) {
 							// write the response for the internal variable
 							strcpy(line, "send data");
-							write((fds_to_child[i])[1], line, len);
+							write((fd_of_proc[i + 1])[1], line, len);
 							// furthemore, write down the process it came from
-							write((fds_to_child[i])[1], child_process_id_str, 3);
+							write((fd_of_proc[i + 1])[1], child_process_id_str, 3);
 
 							// signal that process it requests data from should read
 							sb.sem_num = i + 1;
@@ -473,7 +456,7 @@ int main(int argc, char** argv) {
 
 							// read the response from the process
 							char buff[10];
-							read((fds_to_child[i])[0], buff, 10);
+							read((fd_of_proc[child_process_id + 1])[0], buff, 10);
 							sscanf(buff, "%d", &x);
 
 							break;
@@ -506,27 +489,3 @@ int main(int argc, char** argv) {
 
 	return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// the current problem im dealing with rn
-// is with p1 -> p2
-// im reading an internal variable and writing to an internal variable
-// and that is an issue because child processes cannot read from other child processes
-// as one of the stipulations i laid down
-
-// i must break this stipulation
