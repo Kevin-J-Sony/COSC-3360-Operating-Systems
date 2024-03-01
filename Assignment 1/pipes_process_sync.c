@@ -1,5 +1,5 @@
 /*
-*	This program is the single process version of the precedence flow. It does not
+*	This program is the multiprocess version of the precedence flow. It does not
 *	use semaphores or pipes to different processes, and the sole intention is to provide
 *	the framework on which the multiprocessor program can synchronize off of.
 */
@@ -27,7 +27,7 @@ struct variable {
 *	This part of the code should not be accessed or manipulated by child processes. The reason
 *	for this is because it uses the strtok function provided by the standard library, and
 *	documentation as well as other online sources warned of its volatility. In cases where
-*   the format for strings are known, use sscanf instead.
+*	the format for strings are known, use sscanf instead.
 */
 void init_input_var(char* input_var_line, char* input_line, struct variable* array, int* size) {
 	/*
@@ -90,9 +90,12 @@ void init_internal_var(char* internal_line, struct variable* array, int* size) {
 *	An auxillary function that takes in two numbers, the child_process_id of the writing process
 *	for two processes and the child_process_id of the reading process, and it returns the index of
 *	file descriptors for the pipe that sends info from the writing process to the reading process.
+*
+*	The method operates under the assumption that there are 11 processes, 10 child and 1 parent.
+*	It takes in the 
 */
-int getfds() {
-
+int getfds(int writer_process, int reader_process) {
+	return (writer_process + 1) * (10 + 1) + (reader_process + 1);
 }
 
 /*
@@ -167,9 +170,8 @@ int main(int argc, char** argv) {
 	*	10+1 semaphores, the extra semaphore being for the parent process. The 
 	*	semaphores serve as a way to restrict access to the internal variables.
 	*	
-	*	Furthermore, create 10 pipes, each pipe for communication from the parent to a
-	*	child process. Create another 10 pipes for communication from parent process to
-	*	child process.
+	*	With pipes, closing them means that there is no way to reopen them, and a new
+	*	pipe would have to be constructed to send over the data
 	*/
 	int sid = semget(2077318, 10+1, 0666 | IPC_CREAT);
 	int fds_to_child[10][2];
@@ -201,11 +203,8 @@ int main(int argc, char** argv) {
 	*	become.
 	*/
 	int child_process_id = -1;
-	int pid = fork();
-	if (!pid) {
-		child_process_id = 0;
-	}
-	for (int i = 1; i < n_internal_var; i++) {
+	int pid = 1;
+	for (int i = 0; i < n_internal_var; i++) {
 		if (pid) {
 			pid = fork();
 			if (!pid) {
@@ -263,9 +262,12 @@ int main(int argc, char** argv) {
 					// and so child cannot read yet
 					close((fds_to_child[i])[0]);
 
-					// write in the pipe to pass to the child process
+					// write in the pipe to pass the message to the child process
 					// responsible for the internal_variable
 					write((fds_to_child[i])[1], line, len);
+					// furthemore, write down the process it came from
+					write((fds_to_child[i])[1], child_process_id, sizeof(int))
+
 					printf("is this recieved: %s\n", cur_int_var);
 
 					// close the write end of the pipe since parent is finished writing
@@ -340,23 +342,24 @@ int main(int argc, char** argv) {
 		*/
 		do {
 			printf("process %d waiting...\n", child_process_id);
-			// send a signal that this internal variable is waiting for the parent process to write
+			// send a signal that this internal variable is waiting for the another process to write
 			sb.sem_num = child_process_id + 1;
 			sb.sem_op = -1;
 			sb.sem_flg = 0;
 			semop(sid, &sb, 1);
 			printf("process %d permitted to go!\n", child_process_id);
 
+			// for now, don't close the pipes since there is no way to reopen them
 			// close write end of pipe since child process is not finished reading from parent
-			close((fds_to_child[child_process_id])[1]);
+			// close((fds_to_child[child_process_id])[1]);
 
 			read((fds_to_child[child_process_id])[0], line, len);
 
 			// close read end of pipe since child process is finished reading from parent
-			close((fds_to_child[child_process_id])[0]);
+			// close((fds_to_child[child_process_id])[0]);
 
-			// send a signal that the parent process is no longer needed
-			sb.sem_num = 0;
+			// send a signal that the current process has finished reading
+			sb.sem_num = child_process_id + 1;
 			sb.sem_op = 1;
 			sb.sem_flg = 0;
 			semop(sid, &sb, 1);
