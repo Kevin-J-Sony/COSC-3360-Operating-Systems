@@ -1,0 +1,19 @@
+INSTRUCTION OUTPUT
+
+PROCESS 0
+calculate(1);
+	request(1);
+	use_resources(1,1);
+	request(2);
+	use_resources(1,1);
+	release(2);
+	release(1);
+	print_resources_used;
+	PROCESS 1
+calculate(2);
+	request(2);
+	use_resources(1,1);
+	calculate(1);
+	release(2);
+	print_resources_used;
+	end.	Cereal	Pineapple	Pizza	

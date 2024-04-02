@@ -4,9 +4,6 @@
 *   and Least-Laxity-First scheduing (using Shortest-Job-First as tie-breaker). 
 *   
 *   It is an experiment to determine which scheduling works best with the Banker's Algorithm
-*
-*	C++ is used instead of C since the standard library is equipped with the queue data structure and
-*	so it would be unnecessary to reinvent the wheel in this regard.
 */
 #include <unistd.h>
 #include <sys/types.h>
@@ -338,6 +335,7 @@ int main(int argc, char** argv) {
 	fclose(input);
 
 	// test if resource stack works
+	/*
 	for (int i = 0; i < m; i++) {
 		char* resource = pop_resource(&resources[i]);
 		while(resource != NULL) {
@@ -345,11 +343,23 @@ int main(int argc, char** argv) {
 			resource = pop_resource(&resources[i]);
 		}
 		printf("\n");
-	}
+	}*/
 
 	/*
-	*	Split the program into two
+	*	Split the program into two, so that the program has two copies of processes and instructions.
+	*	One part runs the Banker's algorithm with an EDL scheduler, and the other runs the Banker's algorithm
+	*	with a LLF scheduler.
 	*/
+	int split = fork();
+	if (split) {
+		FILE* output = fopen("temp1.txt", "w");
+		
+		fclose(output);
+	} else {
+		FILE* output = fopen("temp2.txt", "w");
+		
+		fclose(output);
+	}
 
 	// create n processes
 	/*
