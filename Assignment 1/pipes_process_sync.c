@@ -204,7 +204,7 @@ int main(int argc, char** argv) {
 		*/
 		struct sembuf sb;
 		int terminate = (1 == 0);
-		const char delimiter[] = " ,;()\n";
+		const char delimiter[] = " ,;()\n\t";
 		while (!feof(prec_graph) && !terminate) {
 			fgets(sec_line, len, prec_graph);
 			strcpy(line, sec_line);
@@ -374,7 +374,6 @@ int main(int argc, char** argv) {
 				char buff[15];
 				sprintf(buff, "%d", internal_var[child_process_id].value);
 				write((fd_of_proc[writing_process + 1])[1], buff, 15);
-				;
 
 				// signal that the child process finished response
 				// and so waiting process should read
@@ -409,7 +408,7 @@ int main(int argc, char** argv) {
 				terminate = (1 == 1);
 			} else{
 				strcpy(sec_line, line);
-				char* tok = strtok(sec_line," ,;\n");
+				char* tok = strtok(sec_line," ,;\n\t");
 				int n_elements = 4;
 				int n_char = 3;
 				char ray[n_elements][n_char];
@@ -417,7 +416,7 @@ int main(int argc, char** argv) {
 
 				while (tok != NULL) {
 					strcpy(ray[idx++], tok);
-					tok = strtok(NULL, " ,;\n");
+					tok = strtok(NULL, " ,;\n\t");
 				}
 
 				if (idx != 4) {
@@ -545,7 +544,6 @@ int main(int argc, char** argv) {
 							char buff[15];
 							read((fd_of_proc[child_process_id + 1])[0], buff, 15);
 							sscanf(buff, "%d", &x);
-							;
 
 							break;
 						}

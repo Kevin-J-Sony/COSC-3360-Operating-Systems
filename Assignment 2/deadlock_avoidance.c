@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <errno.h>
 
 #define TRUE (1 == 1)
 #define FALSE (1 == 0)
@@ -61,13 +61,18 @@ char* deque_instruction(struct instruction** proc_instruct) {
 	return cur_instruct;
 }
 
+/*
+*	This data structure stores the information for the process. In this assignment, the assumption made is that the arrival time for all
+*	processes are t=0
+*/
 struct process {
 	int proc_id;
 	int deadline;
 	int computation_time;
 
+	int remaining_computation_time;
 	struct instruction* proc_instructions;		// this will be read like a queue
-	int current_idx;	// during simulation, current_idx points to the current instruction running
+	struct resource* allocated_resrcs;			// this will be read like a stack
 };
 
 /*
@@ -109,7 +114,22 @@ char* pop_resource(struct resource** resources) {
 	return resource_string;
 }
 
-int safe_state(int n, int m, int* available, int** need, int** allocation) {
+/*
+*	This function reads the instruction strings and returns the type of string it is encoded as an integer
+*	It returns:
+*		- 1 if instruction is calculate
+*		- 2 if instruction is request
+*		- 3 if instruction is use_resource
+*		- 4 if instruction is release
+*		- 5 if instruction is print_resources_used
+*		- 6 if instruction is end
+*/
+int parse_instruction(char* instr_str) {
+	// if (instr_str) {}
+	return 3;
+}
+
+int safe_state(int n, int m, int* available, int** max, int** allocation) {
 	// need + allocation = max
 	int* work = (int*)malloc(sizeof(int) * m);
 	int* finish = (int*)malloc(sizeof(int) * n);
@@ -127,7 +147,7 @@ int safe_state(int n, int m, int* available, int** need, int** allocation) {
 				flag3 = TRUE;
 				int flag2 = TRUE;
 				for (int j = 0; j < m; j++) {
-					flag2 = flag2 && need[i][j] <= work[j];
+					flag2 = flag2 && (max[i][j] - allocation[i][j]) <= work[j];
 				}
 				if (flag2) {
 					for (int j = 0; j < m; j++) {
@@ -200,10 +220,14 @@ int main(int argc, char** argv) {
 	*	MAX and AVAILABLE are not stored within the process/resource data structure for ease of the 
 	*	safety algorithm
 	*
-	*	RESOURCES is an array of stacks. It's important for the m to match the number of resources
-	*	inside the sample_words.txt. Otherwise, there will be errors.
+	*	RESOURCES is an array of stacks not allocated to any process. When a process requests a specific resource,
+	*	it will go to the stack at the specified index and pop the top, pushing it to the RESOURCE stack held by the process.
+	*	It's important for the m to match the number of resources inside the sample_words.txt. Otherwise, there will be errors.
+	*
+	*	REQUEST is an array to be filled by each process whenever it requests resources.
 	*/
 	int* available = (int*)malloc(sizeof(int) * m);
+	int* request = (int*)malloc(sizeof(int) * m);
 	int** max = (int**)malloc(sizeof(int*) * n);
 	int** allocation = (int**)malloc(sizeof(int*) * n);
 	struct process* processes = (struct process*)malloc(sizeof(struct process) * n);
@@ -213,6 +237,7 @@ int main(int argc, char** argv) {
 		max[i] = (int*)malloc(sizeof(int) * m);
 		allocation[i] = (int*)malloc(sizeof(int) * m);
 		processes[i].proc_instructions = NULL;
+		processes[i].allocated_resrcs = NULL;
 	}
 
 
@@ -225,16 +250,24 @@ int main(int argc, char** argv) {
 			fscanf(input, "%d", &max[i][j]);
 			allocation[i][j] = 0;
 		}
-		printf("\n");
 	}
 
 	/*
 	*	There should only need to be one instance of struct sembuf since 
 	*	this is a data structure to send information to the OS to change the internal
 	*	state of the semaphore rather than modify the state directly.
+	*
+	*	There is m semaphores corresponding to the number of resources, as well as 1 extra
+	*	semaphore so that the LLF scheduler and EDL scheduler do not run concurrently.
 	*/
 	struct sembuf op;
-	int sid = semget(2077318, m, 0666 | IPC_CREAT);
+	int sid1 = semget(20, m + 1, 0666 | IPC_CREAT);
+	int sid2 = semget(21, 1, 0666 | IPC_CREAT);
+	
+	if (sid1 == -1) {
+        fprintf(stderr, "semget failed: %s\n", strerror(errno));
+	}
+
 	/*
 	*	In allocating a resource, the following instructions are used
 	*		op.sem_num = resource_idx;
@@ -252,10 +285,12 @@ int main(int argc, char** argv) {
 		op.sem_num = i;
 		op.sem_op = available[i];
 		op.sem_flg = 0;
-		semop(sid, &op, 1);
+		semop(sid1, &op, 1);
 	}
-
-	int current_execution_time = 0;
+	op.sem_num = m;
+	op.sem_op = 1;
+	op.sem_flg = 0;
+	semop(sid1, &op, 1);
 
 	/*
 	*	The remaining lines in the file are the processes, their deadline and computation time,
@@ -275,9 +310,9 @@ int main(int argc, char** argv) {
 			sscanf(line, "%d", &processes[proc_count].deadline);
 			fgets(line, len, input);
 			sscanf(line, "%d", &processes[proc_count].computation_time);
+			processes[proc_count].remaining_computation_time = processes[proc_count].computation_time;
 
 			int terminate = (1 == 0);
-			printf("PROCESS COUNT: %d\n", proc_count);
 			while (!feof(input) && !terminate) {
 				fgets(line, len, input);
 				strcpy(sec_line, line);
@@ -326,7 +361,6 @@ int main(int argc, char** argv) {
 		tok = strtok(NULL, ": ,");
 		tok = strtok(NULL, ": ,");
 		while (tok != NULL) {
-			printf("%s\n", tok);
 			push_resource(&resources[ridx], tok);
 			tok = strtok(NULL, ": ,\n");
 		}
@@ -344,51 +378,239 @@ int main(int argc, char** argv) {
 		}
 		printf("\n");
 	}*/
+	
+	char temp_string_example[] = "request(1,2,3,4);";
+	char* tok = strtok(temp_string_example, "(,);\n");
+	tok = strtok(NULL, "(,);\n");
+	int idx = 0;
+	int t;
+	printf("request: ");
+	while (tok != NULL) {
+		sscanf(tok, "%d", &t);
+		tok = strtok(NULL, "(,);\n");
+		printf("%d\t", t);
+	}
+	printf("\n");
 
 	/*
 	*	Split the program into two, so that the program has two copies of processes and instructions.
 	*	One part runs the Banker's algorithm with an EDL scheduler, and the other runs the Banker's algorithm
 	*	with a LLF scheduler.
+	*
+	*	These will not run consecutively, so that the semaphores can work properly.
 	*/
 	int split = fork();
-	if (split) {
-		FILE* output = fopen("temp1.txt", "w");
-		
-		fclose(output);
-	} else {
-		FILE* output = fopen("temp2.txt", "w");
-		
-		fclose(output);
-	}
+	int command_id = 0; // the seperate processes will assume the mantle of a commanding process
 
-	// create n processes
-	/*
-	int process_id = 0;
-	int tpid = 1;
-	for (int i = 1; i <= n; i++) {
-		if (tpid) {
-			tpid = fork();
-			if (!tpid) {
-				process_id = i;
+	if (split) {
+		op.sem_num = m;	// the last semaphore
+		op.sem_op = -1;
+		op.sem_flg = 0;
+		semop(sid2, &op, 1);
+
+		FILE* output = fopen("temp1.txt", "w+");
+		printf("The top code executed first\n");
+		
+		// check if the system is initially in a safe state
+		int safe = safe_state(n, m, available, max, allocation);
+
+		// create empty master string
+		char* master_string = "";
+
+		// create two semaphore to create mutex between child process and command process
+		int sid3 = semget(22, 2, 0666 | IPC_CREAT);
+
+		// Create n processes
+		int process_id = 0;
+		int tpid = 1;
+		for (int i = 1; i <= n; i++) {
+			if (tpid) {
+				tpid = fork();
+				if (!tpid) {
+					process_id = i;
+				}
 			}
 		}
-	}*/
+		int time = 0;
+		int instr_time;
+		if (!process_id) {
+			// when a process makes a request, it sends this request to the command processss
+			// when it releases resources, it also sends the resources back to the command process
+			int* finish = (int*) malloc(sizeof(int) * n);
+			for (int i = 0; i < n; i++) {
+				finish[i] = FALSE;
+			}
+			int flag = FALSE;
+			
+			char writing_process_id_str[5];
+			int code;
+
+			while (!flag) {
+				// wait until process signals for sid3
+				op.sem_num = 0;
+				op.sem_op = -1;
+				op.sem_flg = 0;
+				semop(sid3, &op, 1);
+	
+				// figure out which process
+				int child_proc_id;
+
+				// read from the pipe dedicated for command process
+				read((fd[0])[0], line, len);
+				read((fd[0])[0], writing_process_id_str, 5);
+				sscanf(writing_process_id_str, "%d", &child_proc_id);
+
+				// read the first integer from line (code for method)
+				char* tok = strtok(line, " \n");
+				tok = strtok(NULL, " ");
+				sscanf(tok, "%d", &code);
+
+				if (code == 0) {
+					// if code is 0, the child process is making a request
+					for (int i = 0; i < m; i++) {
+						tok = strtok(NULL, " ");
+						sscanf(tok, "%d", &request[i]);
+					}
+
+					safe_state(n, m, available, max, allocation);
+
+				} else if (code == 1) {
+					// if code is 1,
+
+				} else if (code == 2) {
+					// if code is 2, 
+
+				}
+
+				write((fd[child_proc_id])[1], line, len);
+				// furthemore, write down the process it came from
+				write((fd[child_proc_id])[1], writing_process_id_str, 5);
+
+				// signal that commanding process has finished execution
+				op.sem_num = 1;
+				op.sem_op = 1;
+				op.sem_flg = 0;
+				semop(sid3, &op, 1);
+				
+			}
+
+		} else {
+			int proc_id = process_id - 1;
+			struct process curr_proc = processes[proc_id];
+			char* string = deque_instruction(&curr_proc.proc_instructions);
+			while (string != NULL) {
+				int n = parse_instruction(string);
+				switch(n) {
+					// 1 is calculate
+					case 1:
+						sscanf(string, "calculate(%d)", &instr_time);
+						time += instr_time;
+						break;
+					
+					// 2 is request
+					// the assignment demands that after each request, print the state of the process
+					case 2:
+						// load the request array
+						char* tok = strtok(string, "(,);\n");
+						tok = strtok(NULL, "(,);\n");
+						int idx = 0;
+						while (tok != NULL) {
+							sscanf(tok, "%d", &request[idx++]);
+							tok = strtok(NULL, "(,);\n");
+						}
+						// send it to the commanding process
+
+						// read the commanding process command
 
 
+						break;
 
-	// test to see if input is read
-	/*
-	for (int i = 0; i < m; i++) {
-		printf("%d\t", available[i]);
-	}
-	printf("\n\n");
-	for (int i = 0; i < n; i++) {
-		for (int j = 0; j < m; j++) {
-			printf("%d\t", max[i][j]);
+					// 3 is use_resource
+					case 3:
+
+						break;
+
+					// 4 is release
+					case 4:
+						break;
+
+					// 5 is print_resources_used
+					// print process number and master string
+					case 5:
+						break;
+
+					// 6 is end
+					case 6:
+						break;
+					
+					default:
+						fprintf(stderr, "Wrong n returned\n");
+						exit(1);
+				}
+
+				string = deque_instruction(&curr_proc.proc_instructions);
+			}
 		}
-		printf("\n");
-	}*/
 
+		fclose(output);
+		semctl(sid3, 0, IPC_RMID, 0);
+
+		op.sem_num = m;	// the last semaphore
+		op.sem_op = 1;
+		op.sem_flg = 0;
+		semop(sid2, &op, 1);
+
+	} else {
+		op.sem_num = m;	// the last semaphore
+		op.sem_op = -1;
+		op.sem_flg = 0;
+		semop(sid2, &op, 1);
+
+		FILE* output = fopen("temp2.txt", "w");
+		printf("The bottom code executed\n");
+
+		// check if the system is initially in a safe state
+		int safe = safe_state(n, m, available, max, allocation);
+
+		// create empty master string
+		char* master_string = "";
+
+		// create semaphore to restrict access to command process
+		int sid3 = semget(22, 1, 0666 | IPC_CREAT);
+
+		// Create n processes
+		int process_id = 0;
+		int tpid = 1;
+		for (int i = 1; i <= n; i++) {
+			if (tpid) {
+				tpid = fork();
+				if (!tpid) {
+					process_id = i;
+				}
+			}
+		}
+
+		int time = 0;
+		if (!process_id) {
+
+		} else {
+			int proc_id = process_id - 1;
+			struct process curr_proc = processes[proc_id];
+			char* string = deque_instruction(&curr_proc.proc_instructions);
+			while (string != NULL) {
+				// fprintf(stdout, "%s\n", string);
+				string = deque_instruction(&curr_proc.proc_instructions);
+			}
+		}
+
+		fclose(output);
+		semctl(sid3, 0, IPC_RMID, 0);
+
+		op.sem_num = m;	// the last semaphore
+		op.sem_op = 1;
+		op.sem_flg = 0;
+		semop(sid2, &op, 1);
+	}
 
 	for (int i = 0; i < n; i++) {
 		free(max[i]);
@@ -396,7 +618,11 @@ int main(int argc, char** argv) {
 	}
 	free(max);
 	free(available);
+	free(request);
 	free(allocation);
+
+	semctl(sid1, 0, IPC_RMID, 0);
+	semctl(sid2, 0, IPC_RMID, 0);
 
 
 	return 0;
