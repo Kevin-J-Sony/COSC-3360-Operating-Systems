@@ -252,6 +252,11 @@ int main(int argc, char** argv) {
 	key_t key1 = ftok("temp1.txt", 'A');
 	int sid1 = semget(key1, 1, 0666 | IPC_CREAT);
 	
+	// create n + 1 semaphores, one for each child process, and one for deadlock process
+	// parent process has process_id = n, so the semaphore corresponding to it is semaphore @ n
+	key_t key2 = ftok("temp2.txt", 'B');
+	int sid3 = semget(key2, n + 1, 0666 | IPC_CREAT);
+
 	if (sid1 == -1) {
         fprintf(stderr, "semget failed: %s\n", strerror(errno));
 	}
@@ -269,10 +274,12 @@ int main(int argc, char** argv) {
 	*		op.sem_flg = 0;
 	*		semop(sid, &op, 1);
 	*/
+	/*
 	op.sem_num = 0;
 	op.sem_op = 1;
 	op.sem_flg = 0;
 	int t = semop(sid1, &op, 1);
+	*/
 
 	/*
 	*	The remaining lines in the file are the processes, their deadline and computation time,
@@ -391,31 +398,26 @@ int main(int argc, char** argv) {
 	*/
 	int split = fork();
 	int command_id = 0; // the seperate processes will assume the mantle of a commanding process
-
+	int error;
 	if (split) {
 
 		sleep(10);
 
 		// execute EDL and LLF seperatly
+		
 		op.sem_num = 0;
 		op.sem_op = -1;
 		op.sem_flg = 0;
-		int error = semop(sid1, &op, 1);
+		error = semop(sid1, &op, 1);
 		if (error == -1) {
 			fprintf(stderr, "\nsemop error(1) is: %s\n", strerror(errno));
 		}
-		printf("top part executed");
-
-		printf("--------------------------------------\nBANKER'S ALGORITHM WITH EDF SCHEDULING\n--------------------------------------\n");
+		
+		printf("=======================================\nBANKER'S ALGORITHM WITH EDF SCHEDULING\n=======================================\n");
 
 
 		// check if the system is initially in a safe state
 		int safe = safe_state(n, m, available, max, allocation, finish);
-
-		// create n + 1 semaphores, one for each child process, and one for deadlock process
-		// parent process has process_id = n, so the semaphore corresponding to it is semaphore @ n
-		key_t key2 = ftok("temp2.txt", 'B');
-		int sid3 = semget(key2, n + 1, 0666 | IPC_CREAT);
 
 		// create n + 1 file descriptors, one for each child process, and one for deadlock process
 		int** fd = (int**)malloc(sizeof(int) * (n + 1));
@@ -1158,17 +1160,13 @@ int main(int argc, char** argv) {
 		}
 
 
-		// destroy the semaphores for the processes only when all processes have finished
-		if (process_id == n) {
-			semctl(sid3, 0, IPC_RMID, 0);
-		}
-
 		// free the file descriptors
 		for (int i = 0; i <= n; i++) {
 			free(fd[i]);
 		}
 		free(fd);
 
+		/*
 		op.sem_num = 0;
 		op.sem_op = 1;
 		op.sem_flg = 0;
@@ -1176,20 +1174,21 @@ int main(int argc, char** argv) {
 		if (error == -1) {
 			fprintf(stderr, "\nsemop error(19) is: %s\n", strerror(errno));
 		}
-
+		*/
 
 	} else {
 
 		// execute EDL and LLF seperatly
+		/*
 		op.sem_num = 0;	// the last semaphore
 		op.sem_op = -1;
 		op.sem_flg = 0;
 		int error = semop(sid1, &op, 1);
 		if (error == -1) {
 			fprintf(stderr, "\nsemop error(20) is: %s\n", strerror(errno));
-		}
+		}*/
 
-		printf("--------------------------------------\nBANKER'S ALGORITHM WITH LLF SCHEDULING\n--------------------------------------\n");
+		printf("=======================================\nBANKER'S ALGORITHM WITH LLF SCHEDULING\n=======================================\n");
 		/*
 		*	The key difference which distinguishes the LLF scheduler from the EDL scheduler is that after each instruction, the deadlock process
 		*	must check if a context switch must occur.
@@ -1216,19 +1215,6 @@ int main(int argc, char** argv) {
 
 
 
-
-
-
-
-
-		// check if the system is initially in a safe state
-		int safe = safe_state(n, m, available, max, allocation, finish);
-
-		// create n + 1 semaphores, one for each child process, and one for deadlock process
-		// parent process has process_id = n, so the semaphore corresponding to it is semaphore @ n
-		key_t key2 = ftok("temp2.txt", 'B');
-		int sid3 = semget(key2, n + 1, 0666 | IPC_CREAT);
-
 		// create n + 1 file descriptors, one for each child process, and one for deadlock process
 		int** fd = (int**)malloc(sizeof(int) * (n + 1));
 		for (int i = 0; i <= n; i++) {
@@ -1247,6 +1233,7 @@ int main(int argc, char** argv) {
 				}
 			}
 		}
+		printf("process_id: %d\n", process_id);
 
 		/*
 		*	The commanding process (or deadlock process) computes if the system is in a safe state, and if it is, it finds out which process to
@@ -1260,6 +1247,7 @@ int main(int argc, char** argv) {
 		// get the values of the semaphore
 		int time;
 		int instr_time;
+		int safe;
 		if (process_id == n) {
 			// loop until all processes have finished
 			// the time is given by the commanding (deadlock) process
@@ -1381,10 +1369,11 @@ int main(int argc, char** argv) {
 				int code;
 				char* tok = strtok(strdup(line), " \n");
 				sscanf(tok, "%d", &code);
+				printf("code %d has been read: %s\n", code, line);
+
 
 				// after getting the code of the message, we can determine the instruction the code ran
 				if (code == 1) {
-					printf("code 1 has been read\n");
 					// code returned is 1
 					// the instruction executed is calculate
 					// the format of the string is: code time remaining_comp_time
@@ -1625,7 +1614,8 @@ int main(int argc, char** argv) {
 					
 				} else {
 					fprintf(stderr, "how did we get here?\nThe string in the pipe: %s\n", line);
-				}			
+				}
+				printf("\n\n---------------------------\n\n");
 			}
 		} else {
 			// in child process, wait until deadlock process allows to proceed
@@ -1643,7 +1633,7 @@ int main(int argc, char** argv) {
 
 			char* string = deque_instruction(&processes[process_id].proc_instructions);
 			while (string != NULL) {
-				int n = parse_instruction(string);
+				int icode = parse_instruction(string);
 				printf("string(%d): %s", process_id, string);
 
 				// check if any deadline misses occurred
@@ -1658,7 +1648,7 @@ int main(int argc, char** argv) {
 				int idx;
 				int status_code;
 
-				if (n == 1) {
+				if (icode == 1) {
 					// 1 is calculate
 					sscanf(string, "calculate(%d)", &instr_time);
 					time += instr_time;
@@ -1674,11 +1664,6 @@ int main(int argc, char** argv) {
 
 					// send the message to deadlock process
 					write((fd[n])[1], str_to_send, strlen(str_to_send));
-
-					// get the values of the semaphore
-					for (int i = 0; i <= n; i++) {
-						printf("semaphore %d value: %d\n", i, semctl(sid3, i, GETVAL));
-					}
 					
 					// signal the commanding process to read
 					op.sem_num = n;
@@ -1689,8 +1674,6 @@ int main(int argc, char** argv) {
 						fprintf(stderr, "\nsemop error(28) is: %s\n", strerror(errno));
 					}
 
-					sleep(1);
-
 					// wait for commanding process to send the status code
 					op.sem_num = process_id;
 					op.sem_op = -1;
@@ -1700,7 +1683,7 @@ int main(int argc, char** argv) {
 						fprintf(stderr, "\nsemop error(30) is: %s\n", strerror(errno));
 					}
 
-				} else if (n == 2) {
+				} else if (icode == 2) {
 					// 2 is request
 					// the assignment demands that after each request, print the state of the process
 					
@@ -1809,7 +1792,7 @@ int main(int argc, char** argv) {
 						fprintf(stderr, "\nsemop error(32) is: %s\n", strerror(errno));
 					}
 
-				} else if (n == 3) {
+				} else if (icode == 3) {
 					// 3 is use_resource
 					int y;
 					sscanf(string, "use_resources(%d,%d)", &instr_time, &y);
@@ -1838,7 +1821,6 @@ int main(int argc, char** argv) {
 
 					// send the string to the commanding process
 					error = write((fd[n])[1], str_to_send, strlen(str_to_send));
-					printf("why isn't write working!!\n");
 					if (error == -1) {
 						fprintf(stderr, "\nwrite(1) is: %s\n", strerror(errno));
 					}
@@ -1861,7 +1843,7 @@ int main(int argc, char** argv) {
 						fprintf(stderr, "\nsemop error(34) is: %s\n", strerror(errno));
 					}
 
-				} else if (n == 4) {
+				} else if (icode == 4) {
 					// 4 is release
 					// send code and update time
 					time += 1;
@@ -1917,7 +1899,7 @@ int main(int argc, char** argv) {
 						fprintf(stderr, "\nsemop error(36) is: %s\n", strerror(errno));
 					}
 
-				} else if (n == 5) {
+				} else if (icode == 5) {
 					// 5 is print_resources_used
 					// the format of the string is: 5 deadline_misses time remaining_comp_time
 
@@ -1985,7 +1967,7 @@ int main(int argc, char** argv) {
 						fprintf(stderr, "\nsemop error(40) is: %s\n", strerror(errno));
 					}
 
-				} else if (n == 6) {
+				} else if (icode == 6) {
 					// 6 is end
 					// with end process, no computation time is taken, and all resources are released
 					str_to_send = strdup("6 ");
@@ -2089,11 +2071,6 @@ int main(int argc, char** argv) {
 			exit(EXIT_FAILURE);
 		}
 
-		// destroy the semaphores for the processes only when all processes have finished
-		if (process_id == n) {
-			semctl(sid3, 0, IPC_RMID, 0);
-		}
-
 		// free the file descriptors
 		for (int i = 0; i <= n; i++) {
 			free(fd[i]);
@@ -2123,6 +2100,7 @@ int main(int argc, char** argv) {
 	free(allocation);
 
 	semctl(sid1, 0, IPC_RMID, 0);
+	semctl(sid3, 0, IPC_RMID, 0);
 
 	exit(EXIT_SUCCESS);
 
