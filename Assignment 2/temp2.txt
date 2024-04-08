@@ -1,0 +1,46 @@
+in my program, there are parent processes and child processes
+from my parent process, this is the following code. idx is the semaphore corresponding
+to the child process, while process_id corresponds to the process, which in the parent's case
+is the parent.
+
+// signal chosen semaphore operation to execute code
+op.sem_num = idx;
+op.sem_op = 1;
+op.sem_flg = 0;
+error = semop(sid3, &op, 1);
+if (error == -1) {
+    fprintf(stderr, "\nsemop error(21) is: %s\n", strerror(errno));
+}
+
+// child process will execute an instruction, so wait for it to signal
+op.sem_num = process_id;
+op.sem_op = -1;
+op.sem_flg = 0;
+error = semop(sid3, &op, 1);
+if (error == -1) {
+    fprintf(stderr, "\nsemop error(22) is: %s\n", strerror(errno));
+}
+
+
+from the child process, this is the following code
+
+					// signal the commanding process to read
+					op.sem_num = parent_process_id;
+					op.sem_op = 1;
+					op.sem_flg = 0;
+					error = semop(sid3, &op, 1);
+					if (error == -1) {
+						fprintf(stderr, "\nsemop error(28) is: %s\n", strerror(errno));
+					}
+
+					sleep(1);
+
+					// wait for commanding process to send the status code
+					op.sem_num = process_id;
+					op.sem_op = -1;
+					op.sem_flg = 0;
+					error = semop(sid3, &op, 1);
+					if (error == -1) {
+						fprintf(stderr, "\nsemop error(30) is: %s\n", strerror(errno));
+					}
+
