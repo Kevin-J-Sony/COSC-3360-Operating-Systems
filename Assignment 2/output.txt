@@ -1,96 +1,420 @@
---------------------------------------
+=======================================
 BANKER'S ALGORITHM WITH LLF SCHEDULING
---------------------------------------
-process 0 state is: 0
-process 1 state is: 0
-valid idx = 1
-deadlock time: 0
-string(1): calculate(2);
-string to send: 1 2 5
-semaphore 0 value: 0
-semaphore 1 value: 0
-string(1): request(2);
-From child process(1): 2 2 3 4
+=======================================
+State of the system:
+available = 3 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 0 
 
-
-
-process(1) status(0)
-available[0] = 1
-allocation = 2 
-need = 0 
-line: 1 2 50 0 2 Cereal Pineapple 
-
-2 -- Master string:  
-
-
-process 0 state is: 0
-process 1 state is: 4
+need[0] = 3 
+need[1] = 2 
+process 0 state is [0] and lax is [12 - 0 - 8 = 4]
+process 1 state is [0] and lax is [14 - 0 - 7 = 7]
 valid idx = 0
-deadlock time: 3
 string(0): calculate(1);
-string to send: 1 4 7
-semaphore 0 value: 0
-semaphore 1 value: 0
-string(1): request(2);
-From child process(0): 2 2 4 3
+string to send: 1 1 7
+From child process(0): 1 1 7
+code 1 has been read: 1 1 7
 
 
+---------------------------
 
-process(0) status(1)
-available[0] = 1
-allocation = 0 
-need = 3 
+State of the system:
+available = 3 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 0 
+
+need[0] = 3 
+need[1] = 2 
+process 0 state is [2] and lax is [12 - 1 - 7 = 4]
+process 1 state is [0] and lax is [14 - 1 - 7 = 6]
+valid idx = 0
 string(0): request(1);
-process 0 state is: 3
-process 1 state is: 1
-valid idx = 1
-line: 1 4 70 0 2 Cereal Pineapple 
-
-2 -- Master string:  
-
-
-From child process(1): 2 1 5 6
+From child process(0): 2 1 2 6
+code 2 has been read: 2 1 2 6
 
 
 
-process(1) status(0)
-available[0] = 0
-allocation = 3 
-need = -1 
-string(1): request(2);
-process 0 state is: 3
-process 1 state is: 4
-valid idx = 1
-From child process(1): 2 2 5 2
-
-
-
-process(1) status(1)
-available[0] = 0
-allocation = 3 
-need = -1 
-line: 0 0 1 Pizza 1 eal Pineapple 
-
-2 -- Master string:  
-
-
-
-semop error(32) is: Identifier removed
-
-semop error(30) is: Identifier removed
-string(1): use_resources(1,1);
-line: 1  
-string to send: 3 6 1 (5)
+process(0) status(0)
+available[0] = 2
+allocation = 1 
+need = 2 
+string to send: 0 0 1 Cereal 
+line: 0 0 1 Cereal 
 
 1 -- Master string:  
 
 
 
-semop error(31) is: Invalid argument
 
-semop error(32) is: Invalid argument
-string(0): request(1);
+---------------------------
 
-semop error(29) is: Invalid argument
+State of the system:
+available = 2 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 1 
+allocation[1] = 0 
 
-semop error(30) is: Invalid argument
+need[0] = 2 
+need[1] = 2 
+process 0 state is [4] and lax is [12 - 2 - 6 = 4]
+process 1 state is [0] and lax is [14 - 2 - 7 = 5]
+valid idx = 1
+string(1): calculate(2);
+string to send: 1 4 5
+From child process(1): 1 4 5
+code 1 has been read: 1 4 5
+
+
+---------------------------
+
+State of the system:
+available = 2 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 1 
+allocation[1] = 0 
+
+need[0] = 2 
+need[1] = 2 
+process 0 state is [1] and lax is [12 - 4 - 6 = 2]
+process 1 state is [2] and lax is [14 - 4 - 5 = 5]
+valid idx = 0
+string(0): use_resources(1,1);
+time: 4, instr_time: 1, remaining time: 6
+string to send: 3 5 5 (5)
+From child process(0): 3 5 5
+code 3 has been read: 3 5 5
+
+
+---------------------------
+
+State of the system:
+available = 2 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 1 
+allocation[1] = 0 
+
+need[0] = 2 
+need[1] = 2 
+process 0 state is [2] and lax is [12 - 5 - 5 = 2]
+process 1 state is [2] and lax is [14 - 5 - 5 = 4]
+valid idx = 0
+string(0): request(2);
+From child process(0): 2 2 6 4
+code 2 has been read: 2 2 6 4
+
+
+
+process(0) status(0)
+available[0] = 0
+allocation = 3 
+need = 0 
+string to send: 0 0 2 Pineapple Pizza 
+line: 0 0 2 Pineapple Pizza 
+
+1 -- Master string:  Cereal 
+
+
+
+
+---------------------------
+
+State of the system:
+available = 0 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 3 
+allocation[1] = 0 
+
+need[0] = 0 
+need[1] = 2 
+process 0 state is [4] and lax is [12 - 6 - 4 = 2]
+process 1 state is [2] and lax is [14 - 6 - 5 = 3]
+valid idx = 1
+string(1): request(2);
+From child process(1): 2 2 7 4
+code 2 has been read: 2 2 7 4
+
+
+
+process(1) status(1)
+available[0] = 0
+allocation = 0 
+need = 2 
+string to send: 1 
+line: 1  
+
+2 -- Master string:  
+
+
+
+
+---------------------------
+
+State of the system:
+available = 0 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 3 
+allocation[1] = 0 
+
+need[0] = 0 
+need[1] = 2 
+process 0 state is [1] and lax is [12 - 7 - 4 = 1]
+process 1 state is [3] and lax is [14 - 7 - 4 = 3]
+valid idx = 0
+string(0): use_resources(1,1);
+time: 7, instr_time: 1, remaining time: 4
+string to send: 3 8 3 (5)
+From child process(0): 3 8 3
+code 3 has been read: 3 8 3
+
+
+---------------------------
+
+State of the system:
+available = 0 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 3 
+allocation[1] = 0 
+
+need[0] = 0 
+need[1] = 2 
+process 0 state is [2] and lax is [12 - 8 - 3 = 1]
+process 1 state is [3] and lax is [14 - 8 - 4 = 2]
+valid idx = 0
+string(0): release(2);
+str_to_send: 4 0 2 Pizza Pineapple  9 2
+From child process(0): 4 0 2 Pizza Pineapple  9 2
+code 4 has been read: 4 0 2 Pizza Pineapple  9 2
+n_of_resrc = 2, allocation[0][0] = 1, available[0] = 2
+
+
+---------------------------
+
+process 1 is ready
+State of the system:
+available = 2 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 1 
+allocation[1] = 0 
+
+need[0] = 2 
+need[1] = 2 
+process 0 state is [2] and lax is [12 - 9 - 2 = 1]
+process 1 state is [1] and lax is [14 - 9 - 4 = 1]
+valid idx = 1
+string(1): request(2);
+From child process(1): 2 2 10 3
+code 2 has been read: 2 2 10 3
+
+
+
+process(1) status(0)
+available[0] = 0
+allocation = 2 
+need = 0 
+string to send: 0 0 2 Pineapple Pizza 
+line: 0 0 2 Pineapple Pizza 
+
+2 -- Master string:  
+
+
+
+
+---------------------------
+
+State of the system:
+available = 0 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 1 
+allocation[1] = 2 
+
+need[0] = 2 
+need[1] = 0 
+process 0 state is [2] and lax is [12 - 10 - 2 = 0]
+process 1 state is [4] and lax is [14 - 10 - 3 = 1]
+valid idx = 0
+string(0): release(1);
+str_to_send: 4 0 1 Cereal  11 1
+From child process(0): 4 0 1 Cereal  11 1
+code 4 has been read: 4 0 1 Cereal  11 1
+n_of_resrc = 1, allocation[0][0] = 0, available[0] = 1
+
+
+---------------------------
+
+State of the system:
+available = 1 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 2 
+
+need[0] = 3 
+need[1] = 0 
+process 0 state is [2] and lax is [12 - 11 - 1 = 0]
+process 1 state is [1] and lax is [14 - 11 - 3 = 0]
+valid idx = 1
+string(1): use_resources(1,1);
+time: 11, instr_time: 1, remaining time: 3
+string to send: 3 12 2 (6)
+From child process(1): 3 12 2
+code 3 has been read: 3 12 2
+
+
+---------------------------
+
+State of the system:
+available = 1 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 2 
+
+need[0] = 3 
+need[1] = 0 
+process 0 state is [2] and lax is [12 - 12 - 1 = -1]
+process 1 state is [2] and lax is [14 - 12 - 2 = 0]
+valid idx = 0
+string(0): print_resources_used;
+Print resource
+From child process(0): 5  0 13 0
+code 5 has been read: 5  0 13 0
+available[0] = 1
+allocation = 0 
+need = 3 
+deadline misses = 0
+
+1 -- Master string:  Cereal Pizza 
+
+
+
+
+---------------------------
+
+State of the system:
+available = 1 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 2 
+
+need[0] = 3 
+need[1] = 0 
+process 0 state is [2] and lax is [12 - 13 - 0 = -1]
+process 1 state is [2] and lax is [14 - 13 - 2 = -1]
+valid idx = 1
+string(1): calculate(1);
+string to send: 1 14 1
+From child process(1): 1 14 1
+code 1 has been read: 1 14 1
+
+
+---------------------------
+
+State of the system:
+available = 1 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 2 
+
+need[0] = 3 
+need[1] = 0 
+process 0 state is [2] and lax is [12 - 14 - 0 = -2]
+process 1 state is [2] and lax is [14 - 14 - 1 = -1]
+valid idx = 0
+string(0): end.
+End process
+From child process(0): 6 0  0   14 0
+code 6 has been read: 6 0  0   14 0
+
+
+---------------------------
+
+State of the system:
+available = 1 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 2 
+
+need[0] = 3 
+need[1] = 0 
+process 1 state is [2] and lax is [14 - 14 - 1 = -1]
+valid idx = 1
+string(1): release(2);
+str_to_send: 4 0 2 Pizza Pineapple  15 0
+From child process(1): 4 0 2 Pizza Pineapple  15 0
+code 4 has been read: 4 0 2 Pizza Pineapple  15 0
+n_of_resrc = 2, allocation[1][0] = 0, available[0] = 3
+
+
+---------------------------
+
+State of the system:
+available = 3 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 0 
+
+need[0] = 3 
+need[1] = 2 
+process 1 state is [2] and lax is [14 - 15 - 0 = -1]
+valid idx = 1
+string(1): print_resources_used;
+Print resource
+From child process(1): 5  1 16 -1
+code 5 has been read: 5  1 16 -1
+available[0] = 3
+allocation = 0 
+need = 2 
+deadline misses = 1
+
+2 -- Master string:  Pizza 
+
+
+
+
+---------------------------
+
+State of the system:
+available = 3 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 0 
+
+need[0] = 3 
+need[1] = 2 
+process 1 state is [2] and lax is [14 - 16 - -1 = -1]
+valid idx = 1
+string(1): end.End process
+From child process(1): 6 0  0   16 -1
+code 6 has been read: 6 0  0   16 -1
+
+
+---------------------------
+
+State of the system:
+available = 3 
+max[0] = 3 
+max[1] = 2 
+allocation[0] = 0 
+allocation[1] = 0 
+
+need[0] = 3 
+need[1] = 2 
+valid idx = 1
