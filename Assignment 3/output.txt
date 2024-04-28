@@ -1,0 +1,144 @@
+101 0
+100 1
+102 1
+102 15
+100 2
+100 6
+102 3
+101 1
+101 2
+101 3
+100 7
+100 6
+100 5
+101 4
+101 5
+100 7
+100 7
+101 0
+100 15
+101 1
+101 2
+102 10
+102 3
+101 3
+100 7
+100 5
+100 7
+100 13
+100 6
+100 1
+101 4
+101 5
+102 10
+101 0
+101 1
+100 2
+100 10
+100 2
+100 13
+102 1
+100 3
+100 3
+101 2
+101 3
+101 4
+101 5
+100 1
+102 3
+102 15
+100 2
+100 0
+101 0
+102 3
+102 15
+102 15
+102 0
+stack: 0 
+stack: 1 0 
+stack: 1 0 
+stack: 15 1 0 
+stack: 2 15 1 0 
+stack: 6 2 15 1 0 
+stack: 3 6 2 15 1 0 
+stack: 3 6 2 15 1 0 
+stack: 3 6 2 15 1 0 
+stack: 3 6 2 15 1 0 
+stack: 7 3 6 2 15 1 0 
+stack: 7 3 6 2 15 1 0 
+stack: 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 10 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 13 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+stack: 4 5 7 3 6 2 15 1 0 
+----------RESULTS OF LIFO PAGING POLICY----------
+
+Page faults caused by process 100: 7
+Page faults caused by process 101: 4
+Page faults caused by process 102: 4
+Total number of page faults: 15
+-------------------------------------------------
+
+----------RESULTS OF MRU PAGING POLICY----------
+
+Page faults caused by process 100: 7
+Page faults caused by process 101: 2
+Page faults caused by process 102: 4
+Total number of page faults: 13
+-------------------------------------------------
+
+----------RESULTS OF LRU-X PAGING POLICY----------
+
+Page faults caused by process 100: 8
+Page faults caused by process 101: 7
+Page faults caused by process 102: 4
+Total number of page faults: 19
+-------------------------------------------------
+
+----------RESULTS OF LFU PAGING POLICY----------
+
+Page faults caused by process 100: 8
+Page faults caused by process 101: 7
+Page faults caused by process 102: 4
+Total number of page faults: 19
+-------------------------------------------------
+
