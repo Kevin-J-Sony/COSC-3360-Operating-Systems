@@ -21,6 +21,7 @@ void add_instruction(struct instruction** list_head, int pid, int addr) {
 	new_node->pid = pid;
 	new_node->addr = addr;
 	new_node->next_instruction = NULL;
+	new_node->prev_instruction = NULL;
 
 	// if the linked list head is null, set it to be
 	if (*list_head == NULL) {
@@ -29,6 +30,7 @@ void add_instruction(struct instruction** list_head, int pid, int addr) {
 		struct instruction* last_element = *list_head;
 		while (last_element->next_instruction != NULL)
 			last_element = last_element->next_instruction;
+		new_node->prev_instruction = last_element;
 		last_element->next_instruction = new_node;
 	}
 }
